@@ -1,22 +1,17 @@
-interface Link {
-  slug: string
-  url: string
-  comment?: string
-}
+import type { LinkSchema } from '@/schemas/link'
+import type { z } from 'zod'
 
-export default eventHandler(async (event) => {
-  const { cloudflare } = event.context
-  const { KV } = cloudflare.env
-  const list: Link[] = []
+type Link = z.infer<typeof LinkSchema>
+type SimpleLink = Pick<Link, 'slug' | 'url' | 'comment'>
+
+export default eventHandler(async () => {
+  const list: SimpleLink[] = []
   let finalCursor: string | undefined
 
   try {
     while (true) {
-      const { keys, list_complete, cursor } = await KV.list({
-        prefix: `link:`,
-        limit: 1000,
-        cursor: finalCursor,
-      })
+      const res = await hubKV().keys('link:')
+      console.log(res)
 
       finalCursor = cursor
 
@@ -32,15 +27,16 @@ export default eventHandler(async (event) => {
             }
             else {
               // Forward compatible with links without metadata
-              const { metadata, value: link } = await KV.getWithMetadata(key.name, { type: 'json' })
+              const metadata = (await hubKV().getMeta(key.name)) || {}
+              const link = (await hubKV().get(key.name)) as Link || {}
               if (link) {
                 list.push({
                   slug: key.name.replace('link:', ''),
                   url: link.url,
                   comment: link.comment,
                 })
-                await KV.put(key.name, JSON.stringify(link), {
-                  expiration: metadata?.expiration,
+                await hubKV().set(`link:${link.slug}`, link, {
+                  ttl: metadata?.ttl,
                   metadata: {
                     ...metadata,
                     url: link.url,

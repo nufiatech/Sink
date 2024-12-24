@@ -1,6 +1,8 @@
 import type { z } from 'zod'
 import { LinkSchema } from '@/schemas/link'
 
+type Link = z.infer<typeof LinkSchema>
+
 export default eventHandler(async (event) => {
   const { previewMode } = useRuntimeConfig(event).public
   if (previewMode) {
@@ -10,10 +12,8 @@ export default eventHandler(async (event) => {
     })
   }
   const link = await readValidatedBody(event, LinkSchema.parse)
-  const { cloudflare } = event.context
-  const { KV } = cloudflare.env
+  const existingLink = (await hubKV().get(`link:${link.slug}`)) as Link | null
 
-  const existingLink: z.infer<typeof LinkSchema> | null = await KV.get(`link:${link.slug}`, { type: 'json' })
   if (existingLink) {
     const newLink = {
       ...existingLink,
@@ -23,12 +23,12 @@ export default eventHandler(async (event) => {
       updatedAt: Math.floor(Date.now() / 1000),
     }
     const expiration = getExpiration(event, newLink.expiration)
-    await KV.put(`link:${newLink.slug}`, JSON.stringify(newLink), {
-      expiration,
+    await hubKV().set(`link:${link.slug}`, link, {
+      ttl: expiration ? Math.floor(expiration - (Date.now() / 1000)) : undefined,
       metadata: {
         expiration,
-        url: newLink.url,
-        comment: newLink.comment,
+        url: link.url,
+        comment: link.comment,
       },
     })
     setResponseStatus(event, 201)

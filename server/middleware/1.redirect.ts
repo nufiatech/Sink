@@ -2,6 +2,8 @@ import type { LinkSchema } from '@/schemas/link'
 import type { z } from 'zod'
 import { parsePath, withQuery } from 'ufo'
 
+type Link = z.infer<typeof LinkSchema>
+
 export default eventHandler(async (event) => {
   const { pathname: slug } = parsePath(event.path.replace(/^\/|\/$/g, '')) // remove leading and trailing slashes
   const { slugRegex, reserveSlug } = useAppConfig(event)
@@ -12,12 +14,12 @@ export default eventHandler(async (event) => {
     return sendRedirect(event, homeURL)
 
   if (slug && !reserveSlug.includes(slug) && slugRegex.test(slug) && cloudflare) {
-    const { KV } = cloudflare.env
+    let link: Link | null = null
 
-    let link: z.infer<typeof LinkSchema> | null = null
-
-    const getLink = async (key: string) =>
-      await KV.get(`link:${key}`, { type: 'json', cacheTtl: linkCacheTtl })
+    const getLink = async (key: string) => {
+      const link = await hubKV().get(`link:${key}`, { cacheTtl: linkCacheTtl }) as Link
+      return link || null
+    }
 
     link = await getLink(slug)
 

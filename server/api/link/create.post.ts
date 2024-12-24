@@ -2,10 +2,8 @@ import { LinkSchema } from '@/schemas/link'
 
 export default eventHandler(async (event) => {
   const link = await readValidatedBody(event, LinkSchema.parse)
+  const existingLink = await hubKV().get(`link:${link.slug}`)
 
-  const { cloudflare } = event.context
-  const { KV } = cloudflare.env
-  const existingLink = await KV.get(`link:${link.slug}`)
   if (existingLink) {
     throw createError({
       status: 409, // Conflict
@@ -16,8 +14,8 @@ export default eventHandler(async (event) => {
   else {
     const expiration = getExpiration(event, link.expiration)
 
-    await KV.put(`link:${link.slug}`, JSON.stringify(link), {
-      expiration,
+    await hubKV().set(`link:${link.slug}`, link, {
+      ttl: expiration ? Math.floor(expiration - (Date.now() / 1000)) : undefined,
       metadata: {
         expiration,
         url: link.url,
