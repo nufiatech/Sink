@@ -1,3 +1,7 @@
+name = "sink-pages-app"
+
+pages_build_output_dir = "./dist"
+
 upload_source_maps = true
 
 [dev]
@@ -8,5 +12,3 @@ binding = "AI"
 
 [observability.logs]
 enabled = true
-
-pages_build_output_dir = "./dist"
