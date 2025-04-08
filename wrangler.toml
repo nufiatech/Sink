@@ -1,4 +1,4 @@
-name = "sink-pages-app"
+name = 'nufialinks'
 
 pages_build_output_dir = "./dist"
 
